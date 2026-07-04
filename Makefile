@@ -11,7 +11,7 @@ SWAGGER_PORT ?= 8080
 MOCK_PORT    ?= 4010
 
 .DEFAULT_GOAL := help
-.PHONY: help install openapi build swagger mock \
+.PHONY: help install openapi build swagger mock web demo \
         prisma-generate prisma-migrate prisma-studio db clean
 
 help: ## Показать список команд
@@ -31,6 +31,14 @@ swagger: openapi ## Собрать спеку и открыть Swagger UI в б
 
 mock: openapi ## Поднять мок REST-сервер из спеки — Prism (порт 4010)
 	@$(N) npx @stoplight/prism-cli mock $(SPEC) -p $(MOCK_PORT)
+
+web: ## Запустить фронтенд на Mantine (Vite dev, порт 5173)
+	@$(N) cd web && npm run dev
+
+demo: openapi ## Запустить мок (Prism, :4010) и фронтенд (Vite, :5173) вместе
+	@$(N) npx @stoplight/prism-cli mock $(SPEC) -p $(MOCK_PORT) -d & \
+		PRISM=$$!; trap "kill $$PRISM 2>/dev/null" EXIT INT TERM; \
+		cd web && npm run dev
 
 prisma-generate: ## Сгенерировать Prisma Client из schema.prisma
 	@$(N) npx prisma generate
