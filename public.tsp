@@ -5,6 +5,18 @@ using Http;
 namespace SchedulingService;
 
 /** Публичная страница бронирования — то, что видит гость по расшаренной ссылке. */
+@example(#{
+  user: #{ username: "aleksandr", name: "Александр Иванов", timeZone: "Europe/Moscow" },
+  eventType: #{
+    id: "evt_01",
+    title: "Созвон 30 минут",
+    slug: "30min",
+    description: "Быстрое знакомство и обсуждение вашей задачи.",
+    lengthInMinutes: 30,
+    locations: #[#{ type: "video", integration: "google-meet" }],
+    hidden: false,
+  },
+})
 model PublicEventPage {
   user: PublicUser;
   eventType: EventType;
