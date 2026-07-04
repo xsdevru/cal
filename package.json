@@ -3,12 +3,22 @@
   "version": "0.1.0",
   "type": "module",
   "private": true,
+  "scripts": {
+    "build": "tsp compile .",
+    "docs": "tsp compile . && http-server -c-1 -p 8080 -o /swagger.html"
+  },
   "dependencies": {
+    "@prisma/client": "^7.8.0",
     "@typespec/compiler": "latest",
     "@typespec/http": "latest",
-    "@typespec/rest": "latest",
     "@typespec/openapi": "latest",
-    "@typespec/openapi3": "latest"
+    "@typespec/openapi3": "latest",
+    "@typespec/rest": "latest"
   },
-  "packageManager": "npm@11.18.0+sha512.4faecce0be70366d1c67b1012c4adc1246354a6cc45bf589f92003073b05518d547403df1475c542d67a4845e22b4fafcd7cac0af02c7a96cc6814f09eb003fb"
+  "packageManager": "npm@11.18.0+sha512.4faecce0be70366d1c67b1012c4adc1246354a6cc45bf589f92003073b05518d547403df1475c542d67a4845e22b4fafcd7cac0af02c7a96cc6814f09eb003fb",
+  "devDependencies": {
+    "@stoplight/prism-cli": "^5.14.2",
+    "http-server": "^14.1.1",
+    "prisma": "^7.8.0"
+  }
 }

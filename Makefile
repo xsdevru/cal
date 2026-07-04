@@ -1,0 +1,48 @@
+# Makefile проекта cal — планировщик встреч (аналог cal.com)
+# Все команды выполняются на Node 22 (переключается через nvm).
+
+SHELL := /bin/bash
+
+# Активировать Node 22 перед каждой командой
+N := source $$HOME/.nvm/nvm.sh && nvm use 22 >/dev/null 2>&1 &&
+
+SPEC         := tsp-output/schema/openapi.yaml
+SWAGGER_PORT ?= 8080
+MOCK_PORT    ?= 4010
+
+.DEFAULT_GOAL := help
+.PHONY: help install openapi build swagger mock \
+        prisma-generate prisma-migrate prisma-studio db clean
+
+help: ## Показать список команд
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
+		| awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
+
+install: ## Установить зависимости (npm install)
+	@$(N) npm install
+
+openapi: ## Сгенерировать OpenAPI-спеку из TypeSpec (.tsp -> openapi.yaml)
+	@$(N) npx tsp compile .
+
+build: openapi ## Синоним openapi (сборка спеки)
+
+swagger: openapi ## Собрать спеку и открыть Swagger UI в браузере (порт 8080)
+	@$(N) npx http-server -c-1 -p $(SWAGGER_PORT) -o /swagger.html
+
+mock: openapi ## Поднять мок REST-сервер из спеки — Prism (порт 4010)
+	@$(N) npx @stoplight/prism-cli mock $(SPEC) -p $(MOCK_PORT)
+
+prisma-generate: ## Сгенерировать Prisma Client из schema.prisma
+	@$(N) npx prisma generate
+
+prisma-migrate: ## Применить миграции к БД (prisma migrate dev)
+	@$(N) npx prisma migrate dev
+
+prisma-studio: ## Открыть Prisma Studio — GUI для базы данных
+	@$(N) npx prisma studio
+
+db: ## Поднять локальный Postgres (prisma dev)
+	@$(N) npx prisma dev
+
+clean: ## Удалить сгенерированные артефакты (tsp-output, generated)
+	rm -rf tsp-output generated
