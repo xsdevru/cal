@@ -65,6 +65,17 @@ export interface AvailableSlots {
   slots: Record<string, Slot[]>
 }
 
+export interface PublicUser {
+  username: string
+  name: string
+  timeZone: string
+}
+
+export interface PublicEventPage {
+  user: PublicUser
+  eventType: EventType
+}
+
 export const api = {
   eventTypes: () => http<{ items: EventType[] }>('/event-types'),
   createEventType: (b: Partial<EventType>) =>
@@ -77,4 +88,8 @@ export const api = {
     ),
   createBooking: (b: unknown) =>
     http<Booking>('/bookings', { method: 'POST', body: JSON.stringify(b) }),
+  publicEventPage: (username: string, slug: string) =>
+    http<PublicEventPage>(
+      `/${encodeURIComponent(username)}/${encodeURIComponent(slug)}`,
+    ),
 }

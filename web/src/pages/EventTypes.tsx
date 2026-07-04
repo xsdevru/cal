@@ -18,8 +18,11 @@ import {
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { notifications } from '@mantine/notifications'
-import { IconAlertCircle, IconClock, IconPlus } from '@tabler/icons-react'
+import { IconAlertCircle, IconClock, IconExternalLink, IconPlus } from '@tabler/icons-react'
 import { api, type EventType } from '../api'
+
+// Демо-владелец для публичной ссылки (реальный username пришёл бы из профиля).
+const DEMO_USER = 'aleksandr'
 
 export default function EventTypes() {
   const [items, setItems] = useState<EventType[]>([])
@@ -106,7 +109,18 @@ export default function EventTypes() {
                   {et.description}
                 </Text>
               )}
-              <Code>/{'{username}'}/{et.slug}</Code>
+              <Button
+                component="a"
+                href={`/${DEMO_USER}/${et.slug}`}
+                target="_blank"
+                variant="light"
+                size="xs"
+                fullWidth
+                rightSection={<IconExternalLink size={14} />}
+              >
+                Открыть страницу записи
+              </Button>
+              <Code mt={6}>/{DEMO_USER}/{et.slug}</Code>
             </Card>
           ))}
         </SimpleGrid>
