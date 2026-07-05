@@ -5,7 +5,7 @@ import { newId, newUid } from '../lib/ids.ts'
 import { toBooking, toJson } from '../lib/serialize.ts'
 import { getOwner } from '../lib/owner.ts'
 import { isSlotAvailable } from '../lib/availability.ts'
-import { fail, notFound } from '../lib/http.ts'
+import { badRequest, fail, notFound } from '../lib/http.ts'
 
 interface Attendee {
   name: string
@@ -54,6 +54,11 @@ export const bookingRoutes = {
     const b = req.body as CreateBookingBody
     const eventType = await prisma.eventType.findUnique({ where: { id: b.eventTypeId } })
     if (!eventType) return notFound(reply, 'Тип встречи не найден')
+
+    // Additional guest — отдельная роль от Attendee; дублировать основного гостя нельзя.
+    if (b.guests?.some((email) => email === b.attendee.email)) {
+      return badRequest(reply, 'Дополнительный гость не может совпадать с основным гостем')
+    }
 
     // Инвариант: бронь стоит только на реальном свободном слоте владельца.
     if (!(await isSlotAvailable(eventType, b.start))) {

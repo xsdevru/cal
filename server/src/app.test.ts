@@ -198,6 +198,17 @@ describe('валидация брони на записи', () => {
     expect(second.statusCode).toBe(409)
   })
 
+  it('доп. гость с email attendee → 400', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/bookings',
+      // additional guest дублирует основного гостя — по домену это разные роли, дубль запрещён
+      payload: { ...VALID_BOOKING, guests: ['g@e.com'] },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json()).toMatchObject({ code: 400 })
+  })
+
   it('перенос: невалид → 409, свободный слот и своё же время → 200', async () => {
     const b = await app.inject({ method: 'POST', url: '/bookings', payload: VALID_BOOKING })
     const uid = b.json().uid
