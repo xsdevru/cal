@@ -3,6 +3,12 @@
 Все заметные изменения проекта. Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 проект следует [Semantic Versioning](https://semver.org/lang/ru/).
 
+## [0.1.1] — 2026-07-05
+
+### Bug Fixes
+
+- bookings: match guest and attendee email case-insensitively ([e1fc64c](https://github.com/xsdevru/cal/commit/e1fc64c))
+
 ## [0.1.0] — 2026-07-05
 
 Первый релиз `cal` — spec-first планировщика встреч (аналог cal.com / Calendly): TypeSpec-контракт
@@ -23,4 +29,5 @@
 
 Фундамент: TypeSpec-спека API (`SchedulingService`) и инструментарий (Prisma, Swagger UI, Makefile).
 
+[0.1.1]: https://github.com/xsdevru/cal/releases/tag/v0.1.1
 [0.1.0]: https://github.com/xsdevru/cal/releases/tag/v0.1.0
