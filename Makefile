@@ -14,7 +14,7 @@ PROXY_PORT   ?= 4011
 
 .DEFAULT_GOAL := help
 .PHONY: help install openapi build swagger mock web demo demo-mock \
-        server seed types test verify-contract \
+        server seed types test coverage verify-contract \
         prisma-generate prisma-migrate prisma-studio db-reset clean
 
 help: ## Показать список команд
@@ -49,6 +49,9 @@ types: openapi ## Сгенерировать TS-типы фронта из OpenA
 
 test: ## Прогнать юнит/интеграционные тесты (Vitest)
 	@$(N) npx vitest run
+
+coverage: ## Тесты с отчётом покрытия (v8; отчёт в coverage/)
+	@$(N) npx vitest run --coverage --coverage.include='server/src/**' --coverage.exclude='**/*.test.ts'
 
 demo: openapi prisma-generate ## Бэкенд (Fastify :3000) + фронтенд (Vite :5173) вместе
 	@$(N) PORT=$(SERVER_PORT) npx tsx server/src/index.ts & \
