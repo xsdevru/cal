@@ -139,7 +139,7 @@ export const bookingRoutes = {
 }
 
 // Активные статусы: занимают слот, допускают отмену/перенос.
-const ACTIVE_STATUSES = ['accepted', 'pending']
+export const ACTIVE_STATUSES = ['accepted', 'pending']
 
 // accept/reject: разрешить ожидающую бронь. Валидно только из pending.
 async function resolvePending(

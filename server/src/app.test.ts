@@ -71,6 +71,32 @@ describe('event-types', () => {
     expect(res.json().title).toBe('Консультация 90')
     expect(res.json().slug).toBe('consult') // не тронуто
   })
+
+  it('создание типа с занятым slug → 409, а не 500', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/event-types',
+      payload: {
+        title: 'Дубликат',
+        slug: 'consult', // slug уже занят засиженным evt_consult
+        lengthInMinutes: 30,
+        locations: [],
+      },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json()).toMatchObject({ code: 409 })
+  })
+
+  it('смена slug на занятый через PATCH → 409, а не 500', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/event-types/evt_30min',
+      headers: { 'content-type': 'application/merge-patch+json' },
+      payload: JSON.stringify({ slug: 'consult' }), // slug занят evt_consult
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json()).toMatchObject({ code: 409 })
+  })
 })
 
 describe('booking lifecycle ↔ slots', () => {
@@ -202,6 +228,26 @@ describe('занятость по владельцу', () => {
     expect(await slotStarts('evt_consult')).toContain(SLOT_0600)
     await app.inject({ method: 'POST', url: '/bookings', payload: VALID_BOOKING }) // evt_30min @06:00Z
     expect(await slotStarts('evt_consult')).not.toContain(SLOT_0600)
+  })
+})
+
+describe('удаление типа встречи', () => {
+  it('DELETE типа с активной бронью → 409, тип и бронь на месте', async () => {
+    const b = await app.inject({ method: 'POST', url: '/bookings', payload: VALID_BOOKING })
+    expect(b.statusCode).toBe(200)
+    const uid = b.json().uid
+
+    const del = await app.inject({ method: 'DELETE', url: '/event-types/evt_30min' })
+    expect(del.statusCode).toBe(409)
+
+    // тип встречи не удалён, бронь не потеряна каскадом
+    expect((await app.inject({ method: 'GET', url: '/event-types/evt_30min' })).statusCode).toBe(200)
+    expect((await app.inject({ method: 'GET', url: `/bookings/${uid}` })).statusCode).toBe(200)
+  })
+
+  it('DELETE типа без активных броней → 204', async () => {
+    const del = await app.inject({ method: 'DELETE', url: '/event-types/evt_consult' })
+    expect(del.statusCode).toBe(204)
   })
 })
 

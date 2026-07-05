@@ -4,7 +4,8 @@ import { prisma } from '../db.ts'
 import { newId } from '../lib/ids.ts'
 import { toEventType, toJson } from '../lib/serialize.ts'
 import { getOwner } from '../lib/owner.ts'
-import { badRequest, notFound } from '../lib/http.ts'
+import { badRequest, conflict, isUniqueViolation, notFound } from '../lib/http.ts'
+import { ACTIVE_STATUSES } from './bookings.ts'
 
 interface EventTypeBody {
   title?: string
@@ -39,22 +40,27 @@ export const eventTypeRoutes = {
     if ((b.lengthInMinutes ?? 0) < 1) {
       return badRequest(reply, 'Длительность встречи должна быть не меньше 1 минуты')
     }
-    const row = await prisma.eventType.create({
-      data: {
-        id: newId('evt'),
-        userId: owner.id,
-        title: b.title!,
-        slug: b.slug!,
-        description: b.description ?? null,
-        lengthInMinutes: b.lengthInMinutes!,
-        locations: toJson(b.locations ?? [])!,
-        scheduleId: b.scheduleId ?? null,
-        hidden: b.hidden ?? false,
-        confirmation: b.confirmation ?? 'auto',
-        bookingFields: toJson(b.bookingFields),
-      },
-    })
-    return toEventType(row)
+    try {
+      const row = await prisma.eventType.create({
+        data: {
+          id: newId('evt'),
+          userId: owner.id,
+          title: b.title!,
+          slug: b.slug!,
+          description: b.description ?? null,
+          lengthInMinutes: b.lengthInMinutes!,
+          locations: toJson(b.locations ?? [])!,
+          scheduleId: b.scheduleId ?? null,
+          hidden: b.hidden ?? false,
+          confirmation: b.confirmation ?? 'auto',
+          bookingFields: toJson(b.bookingFields),
+        },
+      })
+      return toEventType(row)
+    } catch (e) {
+      if (isUniqueViolation(e)) return conflict(reply, 'Тип встречи с таким slug уже существует')
+      throw e
+    }
   },
 
   async EventTypes_update(req: FastifyRequest, reply: FastifyReply) {
@@ -76,12 +82,24 @@ export const eventTypeRoutes = {
     if (b.hidden !== undefined) data.hidden = b.hidden
     if (b.confirmation !== undefined) data.confirmation = b.confirmation
     if (b.bookingFields !== undefined) data.bookingFields = toJson(b.bookingFields)
-    const row = await prisma.eventType.update({ where: { id }, data })
-    return toEventType(row)
+    try {
+      const row = await prisma.eventType.update({ where: { id }, data })
+      return toEventType(row)
+    } catch (e) {
+      if (isUniqueViolation(e)) return conflict(reply, 'Тип встречи с таким slug уже существует')
+      throw e
+    }
   },
 
   async EventTypes_delete(req: FastifyRequest, reply: FastifyReply) {
     const { id } = req.params as { id: string }
+    // Не даём каскадом снести историю: тип с активными бронями удалять нельзя.
+    const active = await prisma.booking.count({
+      where: { eventTypeId: id, status: { in: ACTIVE_STATUSES } },
+    })
+    if (active > 0) {
+      return conflict(reply, 'Нельзя удалить тип встречи с активными бронями')
+    }
     try {
       await prisma.eventType.delete({ where: { id } })
     } catch {
