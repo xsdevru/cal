@@ -4,7 +4,7 @@ import { prisma } from '../db.ts'
 import { newId } from '../lib/ids.ts'
 import { toSchedule, toJson } from '../lib/serialize.ts'
 import { getOwner } from '../lib/owner.ts'
-import { notFound } from '../lib/http.ts'
+import { badRequest, notFound } from '../lib/http.ts'
 
 interface ScheduleBody {
   name?: string
@@ -12,6 +12,21 @@ interface ScheduleBody {
   isDefault?: boolean
   availability?: unknown[]
   overrides?: unknown[]
+}
+
+interface OverrideLike {
+  closed?: boolean
+  startTime?: string
+  endTime?: string
+}
+
+/** Исключение на дату валидно, только если день закрыт либо заданы обе границы времени. */
+function hasInvalidOverride(overrides: unknown): boolean {
+  if (!Array.isArray(overrides)) return false
+  return overrides.some((o) => {
+    const ov = o as OverrideLike
+    return !ov.closed && (!ov.startTime || !ov.endTime)
+  })
 }
 
 export const scheduleRoutes = {
@@ -28,9 +43,12 @@ export const scheduleRoutes = {
     return toSchedule(row)
   },
 
-  async Schedules_create(req: FastifyRequest) {
+  async Schedules_create(req: FastifyRequest, reply: FastifyReply) {
     const owner = await getOwner()
     const b = req.body as ScheduleBody
+    if (hasInvalidOverride(b.overrides)) {
+      return badRequest(reply, 'Исключение на дату должно быть closed или иметь startTime и endTime')
+    }
     const row = await prisma.$transaction(async (tx) => {
       // Инвариант: у владельца не больше одного дефолтного расписания.
       if (b.isDefault) {
@@ -60,6 +78,9 @@ export const scheduleRoutes = {
     if (!existing) return notFound(reply, 'Расписание не найдено')
 
     const b = req.body as ScheduleBody
+    if (hasInvalidOverride(b.overrides)) {
+      return badRequest(reply, 'Исключение на дату должно быть closed или иметь startTime и endTime')
+    }
     const data: Record<string, unknown> = {}
     if (b.name !== undefined) data.name = b.name
     if (b.timeZone !== undefined) data.timeZone = b.timeZone

@@ -298,6 +298,32 @@ describe('расписание', () => {
     expect(Object.keys(res.json().slots)).toHaveLength(0)
   })
 
+  it('override без времён и не closed → 400', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/schedules/sch_work',
+      headers: { 'content-type': 'application/merge-patch+json' },
+      payload: JSON.stringify({ overrides: [{ date: '2026-07-08' }] }),
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json()).toMatchObject({ code: 400 })
+  })
+
+  it('override с временами и closed-override принимаются → 200', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/schedules/sch_work',
+      headers: { 'content-type': 'application/merge-patch+json' },
+      payload: JSON.stringify({
+        overrides: [
+          { date: '2026-07-08', startTime: '10:00', endTime: '14:00' },
+          { date: '2026-07-09', closed: true },
+        ],
+      }),
+    })
+    expect(res.statusCode).toBe(200)
+  })
+
   it('создание второго дефолтного снимает флаг с первого', async () => {
     await app.inject({
       method: 'POST',
