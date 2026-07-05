@@ -5,6 +5,9 @@
 tsp-output/
 dist/
 
+# Отчёт покрытия тестами (Vitest)
+coverage/
+
 # Dependency directories
 node_modules/
 /generated/prisma
