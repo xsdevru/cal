@@ -97,6 +97,30 @@ describe('event-types', () => {
     expect(res.statusCode).toBe(409)
     expect(res.json()).toMatchObject({ code: 409 })
   })
+
+  it('создание типа с длительностью < 1 минуты → 400', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/event-types',
+      payload: { title: 'Мгновение', slug: 'zero', lengthInMinutes: 0, locations: [] },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('PATCH длительности < 1 минуты → 400', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/event-types/evt_30min',
+      headers: { 'content-type': 'application/merge-patch+json' },
+      payload: JSON.stringify({ lengthInMinutes: 0 }),
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('DELETE несуществующего типа → 404', async () => {
+    const res = await app.inject({ method: 'DELETE', url: '/event-types/evt_missing' })
+    expect(res.statusCode).toBe(404)
+  })
 })
 
 describe('booking lifecycle ↔ slots', () => {
@@ -234,6 +258,39 @@ describe('валидация брони на записи', () => {
   })
 })
 
+describe('список броней', () => {
+  it('GET /bookings отдаёт брони владельца', async () => {
+    const res = await app.inject({ method: 'GET', url: '/bookings' })
+    expect(res.statusCode).toBe(200)
+    const uids = res.json().items.map((b: { uid: string }) => b.uid)
+    expect(uids).toContain('a1b2c3d4') // сид-бронь
+  })
+
+  it('GET /bookings?status= фильтрует по статусу', async () => {
+    const accepted = await app.inject({ method: 'GET', url: '/bookings?status=accepted' })
+    expect(accepted.json().items.map((b: { uid: string }) => b.uid)).toContain('a1b2c3d4')
+    const cancelled = await app.inject({ method: 'GET', url: '/bookings?status=cancelled' })
+    expect(cancelled.json().items).toHaveLength(0)
+  })
+})
+
+describe('guard-ы неактивной брони', () => {
+  it('отмена и перенос уже отменённой брони → 409', async () => {
+    const cancel = await app.inject({ method: 'POST', url: '/bookings/a1b2c3d4/cancel' })
+    expect(cancel.statusCode).toBe(200)
+    expect(cancel.json().status).toBe('cancelled')
+
+    const again = await app.inject({ method: 'POST', url: '/bookings/a1b2c3d4/cancel' })
+    expect(again.statusCode).toBe(409)
+    const move = await app.inject({
+      method: 'POST',
+      url: '/bookings/a1b2c3d4/reschedule',
+      payload: { start: '2026-07-06T06:30:00Z' },
+    })
+    expect(move.statusCode).toBe(409)
+  })
+})
+
 describe('занятость по владельцу', () => {
   it('бронь одного типа встречи убирает пересекающийся слот другого', async () => {
     expect(await slotStarts('evt_consult')).toContain(SLOT_0600)
@@ -349,5 +406,46 @@ describe('расписание', () => {
     const list = await app.inject({ method: 'GET', url: '/schedules' })
     const defaults = list.json().items.filter((s: { isDefault: boolean }) => s.isDefault)
     expect(defaults).toHaveLength(1)
+  })
+
+  it('PATCH isDefault=true снимает флаг с прежнего дефолта', async () => {
+    // второе расписание, не дефолтное
+    const created = await app.inject({
+      method: 'POST',
+      url: '/schedules',
+      payload: {
+        name: 'Вечернее',
+        timeZone: 'Europe/Moscow',
+        isDefault: false,
+        availability: [{ days: ['Monday'], startTime: '18:00', endTime: '20:00' }],
+      },
+    })
+    const id = created.json().id as string
+    await app.inject({
+      method: 'PATCH',
+      url: `/schedules/${id}`,
+      headers: { 'content-type': 'application/merge-patch+json' },
+      payload: JSON.stringify({ isDefault: true }),
+    })
+    const list = await app.inject({ method: 'GET', url: '/schedules' })
+    const defaults = list.json().items.filter((s: { isDefault: boolean }) => s.isDefault)
+    expect(defaults).toHaveLength(1)
+    expect(defaults[0].id).toBe(id)
+  })
+
+  it('GET /schedules/{id}: существующее → 200, несуществующее → 404', async () => {
+    expect((await app.inject({ method: 'GET', url: '/schedules/sch_work' })).statusCode).toBe(200)
+    expect((await app.inject({ method: 'GET', url: '/schedules/sch_missing' })).statusCode).toBe(404)
+  })
+
+  it('DELETE /schedules/{id}: своё → 204, несуществующее → 404', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/schedules',
+      payload: { name: 'Временное', timeZone: 'Europe/Moscow', availability: [] },
+    })
+    const id = created.json().id as string
+    expect((await app.inject({ method: 'DELETE', url: `/schedules/${id}` })).statusCode).toBe(204)
+    expect((await app.inject({ method: 'DELETE', url: '/schedules/sch_missing' })).statusCode).toBe(404)
   })
 })
