@@ -56,7 +56,9 @@ export const bookingRoutes = {
     if (!eventType) return notFound(reply, 'Тип встречи не найден')
 
     // Additional guest — отдельная роль от Attendee; дублировать основного гостя нельзя.
-    if (b.guests?.some((email) => email === b.attendee.email)) {
+    // Email регистронезависим, поэтому сравниваем нормализованно.
+    const attendeeEmail = b.attendee.email.trim().toLowerCase()
+    if (b.guests?.some((email) => email.trim().toLowerCase() === attendeeEmail)) {
       return badRequest(reply, 'Дополнительный гость не может совпадать с основным гостем')
     }
 

@@ -233,6 +233,16 @@ describe('валидация брони на записи', () => {
     expect(res.json()).toMatchObject({ code: 400 })
   })
 
+  it('дубль гостя ловится без учёта регистра email → 400', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/bookings',
+      // email регистронезависим: G@E.COM — тот же гость, что attendee g@e.com
+      payload: { ...VALID_BOOKING, guests: ['G@E.COM'] },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
   it('перенос: невалид → 409, свободный слот и своё же время → 200', async () => {
     const b = await app.inject({ method: 'POST', url: '/bookings', payload: VALID_BOOKING })
     const uid = b.json().uid
