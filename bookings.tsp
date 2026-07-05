@@ -48,4 +48,14 @@ interface Bookings {
   @route("{uid}/cancel")
   @post
   cancel(@path uid: string): Booking | Error;
+
+  /** Подтвердить ожидающую (`pending`) бронь — владелец */
+  @route("{uid}/accept")
+  @post
+  accept(@path uid: string): Booking | Error;
+
+  /** Отклонить ожидающую (`pending`) бронь — владелец */
+  @route("{uid}/reject")
+  @post
+  reject(@path uid: string): Booking | Error;
 }

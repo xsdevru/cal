@@ -15,6 +15,7 @@ namespace SchedulingService;
     lengthInMinutes: 30,
     locations: #[#{ type: "video", integration: "google-meet" }],
     hidden: false,
+    confirmation: ConfirmationPolicy.auto,
   },
 })
 model PublicEventPage {

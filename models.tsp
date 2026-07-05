@@ -47,11 +47,18 @@ model AvailabilityBlock {
   endTime: string;
 }
 
-/** Исключение на конкретную дату (напр. выходной или особые часы). */
+/** Исключение на конкретную дату: закрытый день либо особые часы. */
 model DateOverride {
   date: plainDate;
-  startTime: string;
-  endTime: string;
+
+  /** Полностью закрытый день — слотов нет. При true время не задаётся. */
+  closed?: boolean = false;
+
+  /** Начало особых часов, HH:MM (обязательно, если день не закрыт). */
+  startTime?: string;
+
+  /** Конец особых часов, HH:MM (обязательно, если день не закрыт). */
+  endTime?: string;
 }
 
 /** Расписание доступности владельца. */
@@ -92,6 +99,18 @@ model VideoLocation {
   integration: string;
 }
 
+/** Политика подтверждения бронирования типа встречи. */
+enum ConfirmationPolicy {
+  /** Бронь сразу подтверждена (`accepted`). */
+  auto,
+
+  /** Бронь создаётся `pending` и ждёт подтверждения владельца. */
+  manual,
+
+  /** Зарезервировано: подтверждение оплатой (пока не реализовано). */
+  payment,
+}
+
 /** Дополнительное поле формы бронирования. */
 model BookingField {
   name: string;
@@ -113,6 +132,7 @@ model EventType {
   description?: string;
 
   /** Длительность встречи в минутах. */
+  @minValue(1)
   lengthInMinutes: int32;
 
   locations: Location[];
@@ -122,6 +142,9 @@ model EventType {
 
   /** Скрыт со страницы бронирования. */
   hidden: boolean = false;
+
+  /** Как подтверждается новая бронь этого типа встречи. */
+  confirmation: ConfirmationPolicy = ConfirmationPolicy.auto;
 
   bookingFields?: BookingField[];
 }
@@ -187,6 +210,7 @@ model Slot {
       lengthInMinutes: 30,
       locations: #[#{ type: "video", integration: "google-meet" }],
       hidden: false,
+      confirmation: ConfirmationPolicy.auto,
     },
     #{
       id: "evt_02",
@@ -196,6 +220,7 @@ model Slot {
       lengthInMinutes: 60,
       locations: #[#{ type: "phone", phone: "+7 900 000-00-00" }],
       hidden: false,
+      confirmation: ConfirmationPolicy.auto,
     },
   ],
 })
