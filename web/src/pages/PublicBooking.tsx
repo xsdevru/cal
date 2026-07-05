@@ -16,21 +16,7 @@ import {
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { IconCalendar, IconClock } from '@tabler/icons-react'
-import { api, type EventType, type Slot } from '../api'
-
-const pad = (n: number) => String(n).padStart(2, '0')
-
-// Мок Prism может вернуть пустую карту слотов — тогда синтезируем демо-слоты
-// 09:00–17:00, чтобы сценарий бронирования можно было пройти вживую.
-function synthSlots(dateStr: string, step: number): Slot[] {
-  const out: Slot[] = []
-  for (let m = 9 * 60; m + step <= 17 * 60; m += step) {
-    const start = new Date(`${dateStr}T${pad(Math.floor(m / 60))}:${pad(m % 60)}:00`)
-    const end = new Date(start.getTime() + step * 60000)
-    out.push({ start: start.toISOString(), end: end.toISOString() })
-  }
-  return out
-}
+import { api, ApiError, type EventType, type Slot } from '../api'
 
 export default function PublicBooking() {
   const [eventTypes, setEventTypes] = useState<EventType[]>([])
@@ -38,7 +24,7 @@ export default function PublicBooking() {
   const [dateStr, setDateStr] = useState(new Date().toISOString().slice(0, 10))
   const [slots, setSlots] = useState<Slot[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
-  const [synth, setSynth] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   const [picked, setPicked] = useState<Slot | null>(null)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -57,17 +43,10 @@ export default function PublicBooking() {
     if (!etId) return
     setLoadingSlots(true)
     setPicked(null)
-    setSynth(false)
     try {
       const r = await api.slots(etId, dateStr, dateStr)
-      let all = Object.values(r.slots ?? {}).flat()
-      if (all.length === 0) {
-        const raw = selectedEt?.lengthInMinutes ?? 30
-        const step = raw > 0 && raw <= 240 ? raw : 30
-        all = synthSlots(dateStr, step)
-        setSynth(true)
-      }
-      setSlots(all)
+      setSlots(Object.values(r.slots ?? {}).flat())
+      setLoaded(true)
     } catch (e) {
       notifications.show({ color: 'red', message: 'Не удалось получить слоты: ' + e })
     } finally {
@@ -97,7 +76,15 @@ export default function PublicBooking() {
       setName('')
       setEmail('')
     } catch (e) {
-      notifications.show({ color: 'red', message: 'Ошибка бронирования: ' + e })
+      if (e instanceof ApiError && e.status === 409) {
+        notifications.show({
+          color: 'orange',
+          message: 'Этот слот уже недоступен — выберите другое время.',
+        })
+        await loadSlots()
+      } else {
+        notifications.show({ color: 'red', message: 'Ошибка бронирования: ' + e })
+      }
     } finally {
       setBooking(false)
     }
@@ -139,27 +126,29 @@ export default function PublicBooking() {
             <Center h={80}>
               <Loader size="sm" />
             </Center>
+          ) : slots.length > 0 ? (
+            <>
+              <Divider label="Свободное время" />
+              <SimpleGrid cols={{ base: 3, sm: 4 }}>
+                {slots.map((s, i) => (
+                  <Button
+                    key={i}
+                    variant={picked === s ? 'filled' : 'default'}
+                    onClick={() => setPicked(s)}
+                  >
+                    {new Date(s.start).toLocaleTimeString('ru-RU', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Button>
+                ))}
+              </SimpleGrid>
+            </>
           ) : (
-            slots.length > 0 && (
-              <>
-                <Divider
-                  label={synth ? 'Свободное время (демо-слоты)' : 'Свободное время'}
-                />
-                <SimpleGrid cols={{ base: 3, sm: 4 }}>
-                  {slots.map((s, i) => (
-                    <Button
-                      key={i}
-                      variant={picked === s ? 'filled' : 'default'}
-                      onClick={() => setPicked(s)}
-                    >
-                      {new Date(s.start).toLocaleTimeString('ru-RU', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </Button>
-                  ))}
-                </SimpleGrid>
-              </>
+            loaded && (
+              <Text c="dimmed" size="sm">
+                Нет свободных слотов на эту дату.
+              </Text>
             )
           )}
 

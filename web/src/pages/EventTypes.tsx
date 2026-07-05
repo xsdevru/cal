@@ -10,6 +10,7 @@ import {
   Loader,
   Modal,
   NumberInput,
+  Select,
   SimpleGrid,
   Stack,
   Text,
@@ -32,6 +33,7 @@ export default function EventTypes() {
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
   const [minutes, setMinutes] = useState<number | string>(30)
+  const [confirmation, setConfirmation] = useState<'auto' | 'manual'>('auto')
   const [saving, setSaving] = useState(false)
 
   const load = () => {
@@ -49,12 +51,19 @@ export default function EventTypes() {
   const submit = async () => {
     setSaving(true)
     try {
-      await api.createEventType({ title, slug, lengthInMinutes: Number(minutes) })
+      await api.createEventType({
+        title,
+        slug,
+        lengthInMinutes: Number(minutes),
+        locations: [],
+        confirmation,
+      })
       notifications.show({ color: 'green', message: 'Тип встречи создан' })
       close()
       setTitle('')
       setSlug('')
       setMinutes(30)
+      setConfirmation('auto')
       load()
     } catch (e) {
       notifications.show({ color: 'red', message: 'Ошибка: ' + e })
@@ -90,13 +99,20 @@ export default function EventTypes() {
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
           {items.map((et, i) => (
             <Card key={i} withBorder radius="md" padding="lg">
-              <Group justify="space-between" mb="xs">
+              <Group justify="space-between" mb="xs" wrap="nowrap">
                 <Text fw={600}>{et.title}</Text>
-                {et.hidden && (
-                  <Badge color="gray" variant="light">
-                    скрыт
-                  </Badge>
-                )}
+                <Group gap={4} wrap="nowrap">
+                  {et.confirmation === 'manual' && (
+                    <Badge color="yellow" variant="light">
+                      по подтверждению
+                    </Badge>
+                  )}
+                  {et.hidden && (
+                    <Badge color="gray" variant="light">
+                      скрыт
+                    </Badge>
+                  )}
+                </Group>
               </Group>
               <Group gap={6} mb="sm">
                 <IconClock size={14} />
@@ -148,6 +164,16 @@ export default function EventTypes() {
             onChange={setMinutes}
             min={5}
             step={5}
+          />
+          <Select
+            label="Подтверждение брони"
+            value={confirmation}
+            onChange={(v) => setConfirmation((v as 'auto' | 'manual') ?? 'auto')}
+            allowDeselect={false}
+            data={[
+              { value: 'auto', label: 'Автоматически' },
+              { value: 'manual', label: 'Вручную (по подтверждению)' },
+            ]}
           />
           <Button onClick={submit} loading={saving}>
             Создать

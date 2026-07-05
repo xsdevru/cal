@@ -2,15 +2,18 @@ import { useEffect, useState } from 'react'
 import {
   Alert,
   Badge,
+  Button,
   Center,
+  Group,
   Loader,
   Stack,
   Table,
   Text,
   Title,
 } from '@mantine/core'
-import { IconAlertCircle } from '@tabler/icons-react'
-import { api, type Booking } from '../api'
+import { notifications } from '@mantine/notifications'
+import { IconAlertCircle, IconCheck, IconX } from '@tabler/icons-react'
+import { api, ApiError, type Booking } from '../api'
 
 const statusColor: Record<string, string> = {
   accepted: 'green',
@@ -23,14 +26,34 @@ export default function Bookings() {
   const [items, setItems] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [acting, setActing] = useState<string | null>(null)
 
-  useEffect(() => {
+  const load = () => {
     api
       .bookings()
       .then((r) => setItems(r.items ?? []))
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(load, [])
+
+  // Подтвердить/отклонить ожидающую бронь (владелец).
+  const resolve = async (uid: string, action: 'accept' | 'reject') => {
+    setActing(uid)
+    try {
+      await (action === 'accept' ? api.acceptBooking(uid) : api.rejectBooking(uid))
+      load()
+    } catch (e) {
+      const msg =
+        e instanceof ApiError && e.status === 409
+          ? 'Бронь уже не ожидает подтверждения — обновите список.'
+          : 'Не удалось выполнить действие: ' + e
+      notifications.show({ color: 'red', message: msg })
+    } finally {
+      setActing(null)
+    }
+  }
 
   return (
     <Stack>
@@ -58,6 +81,7 @@ export default function Bookings() {
                 <Table.Th>Гость</Table.Th>
                 <Table.Th>Начало</Table.Th>
                 <Table.Th>Статус</Table.Th>
+                <Table.Th>Действия</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -75,6 +99,32 @@ export default function Bookings() {
                     <Badge color={statusColor[b.status] ?? 'blue'} variant="light">
                       {b.status}
                     </Badge>
+                  </Table.Td>
+                  <Table.Td>
+                    {b.status === 'pending' && (
+                      <Group gap="xs" wrap="nowrap">
+                        <Button
+                          size="compact-sm"
+                          color="green"
+                          variant="light"
+                          loading={acting === b.uid}
+                          leftSection={<IconCheck size={14} />}
+                          onClick={() => resolve(b.uid, 'accept')}
+                        >
+                          Принять
+                        </Button>
+                        <Button
+                          size="compact-sm"
+                          color="red"
+                          variant="light"
+                          loading={acting === b.uid}
+                          leftSection={<IconX size={14} />}
+                          onClick={() => resolve(b.uid, 'reject')}
+                        >
+                          Отклонить
+                        </Button>
+                      </Group>
+                    )}
                   </Table.Td>
                 </Table.Tr>
               ))}

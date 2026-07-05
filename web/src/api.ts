@@ -1,80 +1,51 @@
-// Типизированный клиент к API планировщика. Запросы идут на /api,
-// Vite проксирует их на мок-сервер Prism (см. vite.config.ts).
+// Типизированный клиент к API планировщика. Запросы идут на /api, Vite проксирует их
+// на реальный бэкенд (:3000, см. vite.config.ts). Типы больше не дублируются вручную —
+// они сгенерированы из TypeSpec/OpenAPI в api-types.ts (обновляются командой `make types`).
+import type { components } from './api-types'
+
+type Schemas = components['schemas']
+
+export type EventType = Schemas['EventType']
+export type Attendee = Schemas['Attendee']
+export type Booking = Schemas['Booking']
+export type Schedule = Schemas['Schedule']
+export type AvailabilityBlock = Schemas['AvailabilityBlock']
+export type Slot = Schemas['Slot']
+export type PublicUser = Schemas['PublicUser']
+export type PublicEventPage = Schemas['PublicEventPage']
+
+// В спеке slots — это Record<Slot[]> (ключ-дата → слоты), но openapi-typescript
+// рендерит unevaluatedProperties как Record<string, never>. Переопределяем корректно.
+export type AvailableSlots = { slots: Record<string, Slot[]> }
 
 const BASE = '/api'
 
+/** Ошибка API с HTTP-статусом — чтобы UI отличал 409 (слот недоступен) от прочего. */
+export class ApiError extends Error {
+  status: number
+  constructor(status: number, message?: string) {
+    super(message ?? `HTTP ${status}`)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
+  // Content-Type ставим только когда есть тело: пустой POST с application/json Fastify
+  // отклоняет как FST_ERR_CTP_EMPTY_JSON_BODY (400) — ломало accept/reject брони.
   const res = await fetch(BASE + path, {
-    headers: { 'Content-Type': 'application/json' },
     ...init,
+    headers: {
+      ...(init?.body != null ? { 'Content-Type': 'application/json' } : {}),
+      ...init?.headers,
+    },
   })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) throw new ApiError(res.status)
   const text = await res.text()
   return (text ? JSON.parse(text) : undefined) as T
 }
 
-export interface EventType {
-  id: string
-  title: string
-  slug: string
-  description?: string
-  lengthInMinutes: number
-  hidden: boolean
-}
-
-export interface Attendee {
-  name: string
-  email: string
-  timeZone: string
-  language?: string
-  phoneNumber?: string
-}
-
-export interface Booking {
-  id: string
-  uid: string
-  title: string
-  status: string
-  start: string
-  end: string
-  duration: number
-  eventTypeId: string
-  attendee: Attendee
-}
-
-export interface AvailabilityBlock {
-  days: string[]
-  startTime: string
-  endTime: string
-}
-
-export interface Schedule {
-  id: string
-  name: string
-  timeZone: string
-  isDefault: boolean
-  availability: AvailabilityBlock[]
-}
-
-export interface Slot {
-  start: string
-  end: string
-}
-
-export interface AvailableSlots {
-  slots: Record<string, Slot[]>
-}
-
-export interface PublicUser {
-  username: string
-  name: string
-  timeZone: string
-}
-
-export interface PublicEventPage {
-  user: PublicUser
-  eventType: EventType
-}
+const post = (path: string) => http<Booking>(path, { method: 'POST' })
 
 export const api = {
   eventTypes: () => http<{ items: EventType[] }>('/event-types'),
@@ -88,6 +59,8 @@ export const api = {
     ),
   createBooking: (b: unknown) =>
     http<Booking>('/bookings', { method: 'POST', body: JSON.stringify(b) }),
+  acceptBooking: (uid: string) => post(`/bookings/${encodeURIComponent(uid)}/accept`),
+  rejectBooking: (uid: string) => post(`/bookings/${encodeURIComponent(uid)}/reject`),
   publicEventPage: (username: string, slug: string) =>
     http<PublicEventPage>(
       `/${encodeURIComponent(username)}/${encodeURIComponent(slug)}`,

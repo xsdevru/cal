@@ -27,20 +27,8 @@ import {
   IconClock,
   IconVideo,
 } from '@tabler/icons-react'
-import { api, type PublicEventPage, type Slot } from '../api'
-
-const pad = (n: number) => String(n).padStart(2, '0')
-
-// Мок Prism отдаёт пустую карту слотов — синтезируем демо-слоты 09:00–17:00.
-function synthSlots(dateStr: string, step: number): Slot[] {
-  const out: Slot[] = []
-  for (let m = 9 * 60; m + step <= 17 * 60; m += step) {
-    const start = new Date(`${dateStr}T${pad(Math.floor(m / 60))}:${pad(m % 60)}:00`)
-    const end = new Date(start.getTime() + step * 60000)
-    out.push({ start: start.toISOString(), end: end.toISOString() })
-  }
-  return out
-}
+import { notifications } from '@mantine/notifications'
+import { api, ApiError, type PublicEventPage, type Slot } from '../api'
 
 function initials(name: string) {
   return name
@@ -60,6 +48,7 @@ export default function PublicPage() {
   const [dateStr, setDateStr] = useState(new Date().toISOString().slice(0, 10))
   const [slots, setSlots] = useState<Slot[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   const [picked, setPicked] = useState<Slot | null>(null)
 
   const [name, setName] = useState('')
@@ -82,13 +71,8 @@ export default function PublicPage() {
     setPicked(null)
     try {
       const r = await api.slots(et.id, dateStr, dateStr)
-      let all = Object.values(r.slots ?? {}).flat()
-      if (all.length === 0) {
-        const raw = et.lengthInMinutes
-        const step = raw > 0 && raw <= 240 ? raw : 30
-        all = synthSlots(dateStr, step)
-      }
-      setSlots(all)
+      setSlots(Object.values(r.slots ?? {}).flat())
+      setLoaded(true)
     } finally {
       setLoadingSlots(false)
     }
@@ -108,6 +92,16 @@ export default function PublicPage() {
         },
       })
       setDone(picked)
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        notifications.show({
+          color: 'orange',
+          message: 'Этот слот уже недоступен — выберите другое время.',
+        })
+        await loadSlots()
+      } else {
+        notifications.show({ color: 'red', message: 'Ошибка бронирования: ' + e })
+      }
     } finally {
       setBooking(false)
     }
@@ -223,23 +217,27 @@ export default function PublicPage() {
                   <Center h={80}>
                     <Loader size="sm" />
                   </Center>
+                ) : slots.length > 0 ? (
+                  <SimpleGrid cols={{ base: 3, xs: 4 }}>
+                    {slots.map((s, i) => (
+                      <Button
+                        key={i}
+                        size="sm"
+                        variant={picked === s ? 'filled' : 'default'}
+                        onClick={() => setPicked(s)}
+                      >
+                        {new Date(s.start).toLocaleTimeString('ru-RU', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </Button>
+                    ))}
+                  </SimpleGrid>
                 ) : (
-                  slots.length > 0 && (
-                    <SimpleGrid cols={{ base: 3, xs: 4 }}>
-                      {slots.map((s, i) => (
-                        <Button
-                          key={i}
-                          size="sm"
-                          variant={picked === s ? 'filled' : 'default'}
-                          onClick={() => setPicked(s)}
-                        >
-                          {new Date(s.start).toLocaleTimeString('ru-RU', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </Button>
-                      ))}
-                    </SimpleGrid>
+                  loaded && (
+                    <Text c="dimmed" size="sm">
+                      Нет свободных слотов на эту дату.
+                    </Text>
                   )
                 )}
 

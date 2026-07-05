@@ -66,6 +66,23 @@ export default function Schedules() {
                   </Group>
                 ))}
               </Stack>
+              {s.overrides && s.overrides.length > 0 && (
+                <>
+                  <Text size="xs" c="dimmed" mt="sm">
+                    Исключения на даты:
+                  </Text>
+                  <Stack gap={4}>
+                    {s.overrides.map((o, k) => (
+                      <Group key={k} gap="xs">
+                        <Text size="sm">{o.date}</Text>
+                        <Text size="sm" c={o.closed ? 'red' : 'dimmed'}>
+                          {o.closed ? 'закрыто' : `${o.startTime}–${o.endTime}`}
+                        </Text>
+                      </Group>
+                    ))}
+                  </Stack>
+                </>
+              )}
             </Card>
           ))}
         </Stack>
