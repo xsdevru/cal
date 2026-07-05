@@ -1,13 +1,82 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// Схема БД планировщика встреч. Источник истины по API — TypeSpec (корень репо);
+// эти модели — хранилище под него. Вложенные структуры (массивы/объекты из моделей
+// TypeSpec) храним как JSON-строки (TEXT) и сериализуем на уровне приложения —
+// портируемо для SQLite и не зависит от версии Prisma.
 
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
 }
 
+// Prisma 7: URL для CLI/миграций берётся из prisma.config.ts, а рантайм-подключение
+// идёт через driver adapter (@prisma/adapter-better-sqlite3), см. server/src/db.ts.
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
+}
+
+/// Владелец расписания (в MVP — один).
+model User {
+  id       String @id
+  username String @unique
+  name     String
+  email    String
+  timeZone String
+
+  schedules  Schedule[]
+  eventTypes EventType[]
+}
+
+/// Расписание доступности владельца.
+model Schedule {
+  id           String  @id
+  userId       String
+  name         String
+  timeZone     String
+  isDefault    Boolean @default(false)
+  availability String // JSON: AvailabilityBlock[]
+  overrides    String? // JSON: DateOverride[]
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventTypes EventType[]
+}
+
+/// Тип встречи — то, чем делятся по публичной ссылке /{username}/{slug}.
+model EventType {
+  id              String  @id
+  userId          String
+  title           String
+  slug            String
+  description     String?
+  lengthInMinutes Int
+  locations       String // JSON: Location[]
+  scheduleId      String?
+  hidden          Boolean @default(false)
+  confirmation    String  @default("auto") // ConfirmationPolicy: auto|manual|payment
+  bookingFields   String? // JSON: BookingField[]
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  schedule Schedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  bookings Booking[]
+
+  @@unique([userId, slug])
+}
+
+/// Бронь встречи.
+model Booking {
+  id          String   @id
+  uid         String   @unique
+  title       String
+  status      String // BookingStatus: accepted|pending|cancelled|rejected
+  start       DateTime
+  end         DateTime
+  duration    Int
+  eventTypeId String
+  attendee    String // JSON: Attendee
+  guests      String? // JSON: string[]
+  location    String? // JSON: Location
+  metadata    String? // JSON: Record<string>
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  eventType EventType @relation(fields: [eventTypeId], references: [id], onDelete: Cascade)
 }

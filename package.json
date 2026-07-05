@@ -5,20 +5,33 @@
   "private": true,
   "scripts": {
     "build": "tsp compile .",
-    "docs": "tsp compile . && http-server -c-1 -p 8080 -o /swagger.html"
+    "docs": "tsp compile . && http-server -c-1 -p 8080 -o /swagger.html",
+    "server": "tsx watch server/src/index.ts",
+    "seed": "tsx server/src/seed.ts",
+    "test": "vitest run",
+    "types": "openapi-typescript tsp-output/schema/openapi.yaml -o web/src/api-types.ts"
   },
   "dependencies": {
+    "@prisma/adapter-better-sqlite3": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@typespec/compiler": "latest",
     "@typespec/http": "latest",
     "@typespec/openapi": "latest",
     "@typespec/openapi3": "latest",
-    "@typespec/rest": "latest"
+    "@typespec/rest": "latest",
+    "dayjs": "^1.11.13",
+    "fastify": "^5.2.0",
+    "fastify-openapi-glue": "^4.9.0",
+    "nanoid": "^5.0.9"
   },
   "packageManager": "npm@11.18.0+sha512.4faecce0be70366d1c67b1012c4adc1246354a6cc45bf589f92003073b05518d547403df1475c542d67a4845e22b4fafcd7cac0af02c7a96cc6814f09eb003fb",
   "devDependencies": {
     "@stoplight/prism-cli": "^5.14.2",
+    "@types/node": "^22.10.5",
     "http-server": "^14.1.1",
-    "prisma": "^7.8.0"
+    "openapi-typescript": "^7.5.0",
+    "prisma": "^7.8.0",
+    "tsx": "^4.19.2",
+    "vitest": "^2.1.8"
   }
 }
