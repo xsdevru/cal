@@ -9,5 +9,16 @@ dist/
 node_modules/
 /generated/prisma
 
+# SQLite база данных (локальная)
+*.db
+*.db-journal
+
+# Сгенерированные из OpenAPI типы фронта
+web/src/api-types.ts
+
 # Environment / secrets
 .env
+
+# Локальный Chrome для браузерной автоматизации и большие скриншоты (не в репозиторий)
+chrome/
+dev-crumb-screenshot.png
